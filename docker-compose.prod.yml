@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:-
+    image: horlacloud/e-commerce-frontend:v1.0.0
+
+  backend:
+    build:-
+    image: horlacloud/e-commerce-backend:v1.0.0

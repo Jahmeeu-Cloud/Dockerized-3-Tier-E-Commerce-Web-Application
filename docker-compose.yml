@@ -1,0 +1,109 @@
+services:
+  # --- 1. FRONTEND SERVICE ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: horlacloud/e-commerce-frontend:v1.0.0
+    container_name: e-commerce-frontend
+    restart: always
+    ports:
+      - "8080:80"
+    networks:
+      - e-commerce-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: horlacloud/e-commerce-backend:v1.0.0
+    container_name: e-commerce-backend
+    restart: always
+    ports:
+      - "3000:5000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=postgres-db
+      - REDIS_HOST=redis-cache
+      - DB_USER=ecommerce_user
+      - DB_PASS=ecommerce_pass
+      - DB_NAME=ecommerce_db
+      # If your backend code specifically checks other variable names, include them too:
+      - POSTGRES_USER=ecommerce_user
+      - POSTGRES_PASSWORD=ecommerce_pass
+      - POSTGRES_DB=ecommerce_db
+    networks:
+      - e-commerce-net
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # --- 2. DATABASE SERVICE (PostgreSQL) ---
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: ecommerce_user
+      POSTGRES_PASSWORD: ecommerce_pass
+      POSTGRES_DB: ecommerce_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - e-commerce-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommerce_user -d ecommerce_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  # --- 3. CACHE SERVICE (Redis) ---
+  redis-cache:
+    image: redis:7-alpine
+    container_name: redis-cache
+    restart: always
+    networks:
+      - e-commerce-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  e-commerce-net:
+    driver: bridge
